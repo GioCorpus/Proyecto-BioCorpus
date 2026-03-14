@@ -1,0 +1,7 @@
+BioCorpus/
+│
+├── main.py
+├── genome_fetcher.py
+├── antigen_predictor.py
+├── sequence_analyzer.py
+└── data/
