@@ -1,0 +1,19 @@
+BioCorpus
+│
+├── genome_fetcher
+│   └ descarga genomas de virus y bacterias
+│
+├── sequence_analyzer
+│   └ analiza proteínas y mutaciones
+│
+├── antigen_predictor
+│   └ predice posibles antígenos
+│
+├── vaccine_candidate_engine
+│   └ propone targets vacunales
+│
+├── AI_models
+│   └ aprendizaje automático
+│
+└── dashboard
+    └ interfaz para investigadores
