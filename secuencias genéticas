@@ -1,0 +1,16 @@
+from Bio import Entrez
+from Bio import SeqIO
+
+Entrez.email = "biocorpus@research.org"
+
+handle = Entrez.efetch(
+    db="nucleotide",
+    id="NC_045512",
+    rettype="fasta",
+    retmode="text"
+)
+
+record = SeqIO.read(handle, "fasta")
+
+print("Nombre:", record.id)
+print("Longitud:", len(record.seq))
