@@ -1,0 +1,1 @@
+pip install biopython pandas numpy scikit-learn matplotlib
