@@ -1,0 +1,9 @@
+def find_epitopes(sequence, length=9):
+
+    epitopes = []
+
+    for i in range(len(sequence)-length):
+        fragment = sequence[i:i+length]
+        epitopes.append(fragment)
+
+    return epitopes
