@@ -1,0 +1,5 @@
+from Bio.SeqUtils import molecular_weight
+
+seq = record.seq
+
+print("Peso molecular:", molecular_weight(seq))
