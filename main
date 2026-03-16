@@ -11,3 +11,151 @@ HIV/AIDS
 COVID-19
 
 Dengue
+
+"""
+biocorpus/main.py
+──────────────────
+Orquestador principal del pipeline BioCorpus v2.
+
+Flujo:
+  1. Cargar configuración
+  2. Descargar genoma desde NCBI
+  3. Extraer proteínas del genoma
+  4. Predecir epítopos con ImmunoNet
+  5. Rankear candidatos antigénicos
+  6. Exportar resultados a CSV
+"""
+
+from __future__ import annotations
+
+import csv
+import json
+import sys
+from pathlib import Path
+
+from antigen_predictor import AntigenCandidate, AntigenPredictor
+from epitope_predictor import EpitopePredictor
+from genome_fetcher import GenomeFetcher
+from utils import ensure_dirs, load_config, setup_logger
+
+# ── Genomas de ejemplo para demostración ─────────────────────────────────────
+DEMO_PATHOGENS = {
+    "SARS-CoV-2":   "NC_045512",
+    "Influenza_H1N1": "NC_026433",
+    "HIV-1":        "NC_001802",
+    "Dengue_1":     "NC_001477",
+}
+
+
+def run_pipeline(
+    accession_id: str,
+    pathogen_name: str = "Unknown",
+    config_path: str = "config.yaml",
+) -> list[AntigenCandidate]:
+    """
+    Ejecuta el pipeline completo para un patógeno dado.
+
+    Args:
+        accession_id: ID de accesión en NCBI (ej. "NC_045512")
+        pathogen_name: Nombre descriptivo del patógeno
+        config_path: Ruta al archivo config.yaml
+
+    Returns:
+        Lista de los mejores candidatos antigénicos.
+    """
+    # 1. Configuración y directorios
+    config = load_config(config_path)
+    ensure_dirs(config)
+    logger = setup_logger("BioCorpus.Pipeline", config)
+
+    logger.info(f"{'='*60}")
+    logger.info(f"BioCorpus v2 — Pipeline iniciado")
+    logger.info(f"Patógeno: {pathogen_name} ({accession_id})")
+    logger.info(f"{'='*60}")
+
+    # 2. Descarga del genoma
+    fetcher = GenomeFetcher(config)
+    genome = fetcher.fetch(accession_id)
+    if genome is None:
+        logger.error(f"No se pudo obtener el genoma {accession_id}. Abortando.")
+        return []
+
+    # 3. Extracción de proteínas
+    proteins = fetcher.get_protein_sequences(genome)
+    if not proteins:
+        logger.warning("No se encontraron proteínas en el genoma.")
+        return []
+
+    protein_ids = [f"{pathogen_name}_protein_{i}" for i in range(len(proteins))]
+
+    # 4. Predictor de epítopos (carga modelo si existe, sino usa pesos iniciales)
+    ep_predictor = EpitopePredictor(config)
+    ep_predictor.load_or_train()  # carga modelo entrenado si existe
+
+    # 5. Predictor de antígenos
+    ag_predictor = AntigenPredictor(config, ep_predictor)
+    candidates = ag_predictor.rank(proteins, protein_ids)
+
+    # 6. Mostrar y exportar resultados
+    logger.info(f"\n{'='*60}\nRESULTADOS — Top {len(candidates)} candidatos\n{'='*60}")
+    for c in candidates:
+        logger.info(c.summary())
+
+    _export_results(candidates, pathogen_name, config)
+
+    return candidates
+
+
+def _export_results(
+    candidates: list[AntigenCandidate],
+    pathogen_name: str,
+    config: dict,
+) -> None:
+    """Exporta candidatos a CSV y JSON."""
+    output_dir = Path(config["paths"]["output_dir"])
+
+    # CSV
+    csv_path = output_dir / f"{pathogen_name}_candidates.csv"
+    with open(csv_path, "w", newline="") as f:
+        writer = csv.writer(f)
+        writer.writerow([
+            "protein_id", "final_score", "epitope_density",
+            "surface_score", "stability_score", "sequence_length",
+        ])
+        for c in candidates:
+            writer.writerow([
+                c.protein_id, c.final_score, c.epitope_density,
+                c.surface_score, c.stability_score, len(c.sequence),
+            ])
+
+    # JSON con epítopos incluidos
+    json_path = output_dir / f"{pathogen_name}_candidates.json"
+    data = [
+        {
+            "protein_id":     c.protein_id,
+            "final_score":    c.final_score,
+            "epitope_density":c.epitope_density,
+            "surface_score":  c.surface_score,
+            "stability_score":c.stability_score,
+            "sequence":       c.sequence,
+            "top_epitopes": [
+                {"pos": e.position, "seq": e.sequence, "score": e.score, "mhc": e.mhc_allele}
+                for e in c.top_epitopes
+            ],
+        }
+        for c in candidates
+    ]
+    with open(json_path, "w") as f:
+        json.dump(data, f, indent=2)
+
+    print(f"\n✅ Resultados exportados:\n   CSV  → {csv_path}\n   JSON → {json_path}")
+
+
+# ── Entrypoint ────────────────────────────────────────────────────────────────
+if __name__ == "__main__":
+    # Uso: python main.py [accession_id] [pathogen_name]
+    accession = sys.argv[1] if len(sys.argv) > 1 else "NC_045512"
+    name      = sys.argv[2] if len(sys.argv) > 2 else "SARS-CoV-2"
+
+    results = run_pipeline(accession_id=accession, pathogen_name=name)
+    print(f"\nPipeline completado. Candidatos encontrados: {len(results)}")
