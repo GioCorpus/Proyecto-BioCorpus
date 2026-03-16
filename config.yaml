@@ -1,1 +1,36 @@
+# BioCorpus v2 — Configuración Central
+# ======================================
+
+entrez:
+  email: "biocorpus@research.org"
+  api_key: ""            # Opcional: NCBI API key para mayor velocidad
+  retries: 3
+  delay_between_requests: 0.5  # segundos
+
+pipeline:
+  epitope_length: 9          # largo estándar de péptidos MHC-I
+  min_immunogenicity_score: 0.6
+  top_candidates: 10
+  mhc_alleles:
+    - "HLA-A*02:01"
+    - "HLA-A*01:01"
+    - "HLA-B*07:02"
+
+model:
+  hidden_dim: 128
+  dropout: 0.3
+  learning_rate: 0.001
+  epochs: 50
+  batch_size: 32
+  train_split: 0.8
+
+paths:
+  data_dir: "data/"
+  models_dir: "models/"
+  output_dir: "output/"
+  logs_dir: "logs/"
+
+logging:
+  level: "INFO"
+  format: "%(asctime)s | %(levelname)s | %(name)s | %(message)s"
 
